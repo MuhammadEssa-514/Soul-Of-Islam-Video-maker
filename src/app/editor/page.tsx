@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Video,
@@ -13,6 +14,7 @@ import {
   Type,
   ChevronDown,
   ChevronUp,
+  Bookmark,
 } from "lucide-react";
 import ImageUploader from "@/components/editor/ImageUploader";
 import TextEditor from "@/components/editor/TextEditor";
@@ -27,12 +29,48 @@ import { BACKDROP_PRESETS, createBackdropDataUrl } from "@/lib/backgrounds/islam
 
 type StudioMode = "ocr" | "text-to-video" | "image-to-video";
 
+const VIRAL_QUOTE_PRESETS = [
+  {
+    name: "Ayatul Kursi",
+    text: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ\nAllah! There is no deity except Him, the Ever-Living, the Sustainer of all existence.",
+  },
+  {
+    name: "Surah Al-Ikhlas",
+    text: "قُلْ هُوَ اللَّهُ أَحَدٌ • اللَّهُ الصَّمَدُ\nSay, 'He is Allah, [who is] One, Allah, the Eternal Refuge.'",
+  },
+  {
+    name: "Dua for Hardship",
+    text: "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ\nAllah is sufficient for us, and He is the best Disposer of affairs.",
+  },
+  {
+    name: "Morning Dhikr",
+    text: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ\nGlory be to Allah and all praise is due to Him, Glory be to Allah the Great.",
+  },
+  {
+    name: "Hadith on Gentleness",
+    text: "إِنَّ اللَّهَ رَفِيقٌ يُحِبُّ الرِّفْقَ\nVerily, Allah is gentle and loves gentleness in all matters.",
+  },
+];
+
 export default function EditorPage() {
-  const [mode, setMode] = useState<StudioMode>("image-to-video");
+  return (
+    <Suspense fallback={<div className="p-10 text-center text-gray-500">Loading Studio...</div>}>
+      <StudioContent />
+    </Suspense>
+  );
+}
+
+function StudioContent() {
+  const searchParams = useSearchParams();
+  const initialMode = (searchParams.get("mode") as StudioMode) || "image-to-video";
+
+  const [mode, setMode] = useState<StudioMode>(initialMode);
 
   // State
   const [images, setImages] = useState<string[]>([]);
-  const [text, setText] = useState<string>("Bismillah ir-Rahman ir-Rahim\nIn the name of Allah, the Most Gracious, the Most Merciful");
+  const [text, setText] = useState<string>(
+    "Bismillah ir-Rahman ir-Rahim\nIn the name of Allah, the Most Gracious, the Most Merciful"
+  );
   const [duration, setDuration] = useState<number>(30);
   const [audioUrl, setAudioUrl] = useState<string | null>("/audio/nasheed-1.mp3");
 
@@ -86,8 +124,12 @@ export default function EditorPage() {
     }
   };
 
+  const loadSampleCalligraphy = () => {
+    setImages(["/samples/sample-verse.png"]);
+  };
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-4 py-2">
+    <div className="w-full max-w-6xl mx-auto space-y-3.5 py-1">
       {/* 3-Option Top Studio Navigation Menu */}
       <div className="bg-[#0b101b]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-xl flex items-center justify-between gap-1">
         <button
@@ -133,6 +175,128 @@ export default function EditorPage() {
         >
           <ImageIcon className="w-3.5 h-3.5" />
           <span>3. Image to Video</span>
+        </button>
+      </div>
+
+      {/* Method 2: 1-Click Nature Master Presets */}
+      <div className="bg-[#0b101b]/80 border border-white/10 rounded-2xl px-3 py-1.5 flex items-center gap-2 overflow-x-auto scrollbar-none shadow-md">
+        <span className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1 flex-shrink-0">
+          <Sparkles className="w-3 h-3 text-amber-400" /> Method 2 Styles:
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setStyleConfig((prev) => ({
+              ...prev,
+              videoStyle: 'ocean-waves',
+              colorFilter: 'midnight-dark',
+              textAnimation: 'converge',
+              backdropDim: 0.35,
+              showSurahBadge: true,
+              surahBadgeText: '🌊 Deep Tranquility • Surah Ar-Rahman',
+              showAudioVisualizer: true,
+              showSacredFrame: true,
+            }));
+          }}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+            styleConfig.videoStyle === 'ocean-waves'
+              ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/50 ring-1 ring-cyan-500/30'
+              : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+          }`}
+        >
+          🌊 Ocean Sea Waves
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStyleConfig((prev) => ({
+              ...prev,
+              videoStyle: 'rising-sun',
+              colorFilter: 'original',
+              textAnimation: 'cascade',
+              backdropDim: 0.3,
+              showSurahBadge: true,
+              surahBadgeText: '🌅 Fajr Dawn • Morning Reflections',
+              showAudioVisualizer: true,
+              showSacredFrame: true,
+            }));
+          }}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+            styleConfig.videoStyle === 'rising-sun'
+              ? 'bg-amber-500/20 text-amber-200 border-amber-500/50 ring-1 ring-amber-500/30'
+              : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+          }`}
+        >
+          🌅 Rising Sun Dawn
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStyleConfig((prev) => ({
+              ...prev,
+              videoStyle: 'tree-leaves',
+              colorFilter: 'emerald-twilight',
+              textAnimation: 'typewriter',
+              backdropDim: 0.38,
+              showSurahBadge: true,
+              surahBadgeText: '🍃 Healing Canopy • Sacred Peace',
+              showAudioVisualizer: true,
+              showSacredFrame: true,
+            }));
+          }}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+            styleConfig.videoStyle === 'tree-leaves'
+              ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/50 ring-1 ring-emerald-500/30'
+              : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+          }`}
+        >
+          🍃 Swaying Trees & Leaves
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStyleConfig((prev) => ({
+              ...prev,
+              videoStyle: 'desert-dunes',
+              colorFilter: 'vintage-parchment',
+              textAnimation: 'pop-kinetic',
+              backdropDim: 0.4,
+              showSurahBadge: true,
+              surahBadgeText: '🏜️ Sacred Desert • Whispering Sands',
+              showAudioVisualizer: true,
+              showSacredFrame: true,
+            }));
+          }}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+            styleConfig.videoStyle === 'desert-dunes'
+              ? 'bg-amber-600/20 text-amber-300 border-amber-600/50 ring-1 ring-amber-600/30'
+              : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+          }`}
+        >
+          🏜️ Golden Desert Dunes
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStyleConfig((prev) => ({
+              ...prev,
+              videoStyle: 'sacred-rain',
+              colorFilter: 'moody-grey',
+              textAnimation: 'fade',
+              backdropDim: 0.35,
+              showSurahBadge: true,
+              surahBadgeText: '🌧️ Sacred Rain • Divine Mercy',
+              showAudioVisualizer: true,
+              showSacredFrame: true,
+            }));
+          }}
+          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+            styleConfig.videoStyle === 'sacred-rain'
+              ? 'bg-blue-500/20 text-blue-200 border-blue-500/50 ring-1 ring-blue-500/30'
+              : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+          }`}
+        >
+          🌧️ Serene Rain on Glass
         </button>
       </div>
 
@@ -190,6 +354,17 @@ export default function EditorPage() {
                         fitMode={styleConfig.imageFit}
                         onFitModeChange={(mode) => setStyleConfig({ ...styleConfig, imageFit: mode })}
                       />
+
+                      {images.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={loadSampleCalligraphy}
+                          className="w-full py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/20 flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Load Sample Islamic Calligraphy
+                        </button>
+                      )}
+
                       <div>
                         <label className="text-xs font-semibold text-gray-300 block mb-1">
                           Overlay Text (Optional - Appears with kinetic animation)
@@ -205,6 +380,25 @@ export default function EditorPage() {
                   ) : (
                     /* Text to Video Mode */
                     <div className="space-y-3">
+                      {/* Quick Presets */}
+                      <div>
+                        <span className="text-[11px] font-semibold text-gray-400 block mb-1.5 flex items-center gap-1">
+                          <Bookmark className="w-3 h-3 text-amber-400" /> 1-Click Islamic Verse Presets:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {VIRAL_QUOTE_PRESETS.map((qp, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setText(qp.text)}
+                              className="text-[10px] font-medium bg-white/5 hover:bg-[#d97706]/20 hover:text-amber-200 border border-white/10 px-2.5 py-1 rounded-lg transition-colors text-gray-300"
+                            >
+                              {qp.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-xs font-semibold text-gray-300 block mb-1">
                           Verse / Hadith / Quote Text
@@ -213,7 +407,7 @@ export default function EditorPage() {
                           value={text}
                           onChange={(e) => setText(e.target.value)}
                           placeholder="Enter your quote or verse text here..."
-                          className="w-full bg-black/40 border border-white/15 rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#d97706] resize-none h-24 leading-relaxed font-sans"
+                          className="w-full bg-black/40 border border-white/15 rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#d97706] resize-none h-20 leading-relaxed font-sans"
                         />
                       </div>
 
@@ -234,7 +428,7 @@ export default function EditorPage() {
                                   : "border-white/10 bg-white/[0.02] text-gray-400 hover:text-white"
                               }`}
                             >
-                              <div className={`w-full h-8 rounded-lg mb-1 ${bp.previewBg} border border-white/10`} />
+                              <div className={`w-full h-7 rounded-lg mb-1 ${bp.previewBg} border border-white/10`} />
                               <span className="text-[10px] font-bold block truncate">{bp.name}</span>
                             </button>
                           ))}

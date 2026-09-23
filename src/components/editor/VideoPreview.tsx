@@ -40,6 +40,7 @@ export default function VideoPreview({
   // Loaded images cache
   const loadedImgsRef = useRef<HTMLImageElement[]>([]);
   const watermarkImgRef = useRef<HTMLImageElement | null>(null);
+  const bgVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -104,6 +105,36 @@ export default function VideoPreview({
     img.src = watermarkConfig.imageUrl;
   }, [watermarkConfig.imageUrl]);
 
+  // Custom Video Backdrop Setup
+  useEffect(() => {
+    if (!styleConfig.customVideoUrl) {
+      if (bgVideoRef.current) {
+        bgVideoRef.current.pause();
+        bgVideoRef.current.src = '';
+        bgVideoRef.current = null;
+      }
+      renderFrame(currentTime);
+      return;
+    }
+    const vid = document.createElement('video');
+    vid.crossOrigin = 'anonymous';
+    vid.muted = true;
+    vid.loop = true;
+    vid.playsInline = true;
+    vid.src = styleConfig.customVideoUrl;
+    vid.onloadeddata = () => {
+      if (isPlaying) {
+        vid.play().catch(() => {});
+      }
+      renderFrame(currentTime);
+    };
+    bgVideoRef.current = vid;
+    return () => {
+      vid.pause();
+      vid.src = '';
+    };
+  }, [styleConfig.customVideoUrl]);
+
   // Audio setup
   useEffect(() => {
     if (audioUrl) {
@@ -133,62 +164,89 @@ export default function VideoPreview({
       const t = Math.min(1, Math.max(0, duration > 0 ? timeSec / duration : 0));
       const frameNum = Math.floor(timeSec * 30);
 
-      // Clean
-      ctx.fillStyle = '#080808';
+      // 1. Base Dark Backdrop
+      ctx.fillStyle = '#060a10';
       ctx.fillRect(0, 0, W, H);
 
       const imgs = loadedImgsRef.current;
-      if (imgs.length > 0) {
-        // Multi-image sequence calculations
+      const hasImages = imgs.length > 0;
+
+      // 2. Custom Video Backdrop (Method 2)
+      if (styleConfig.customVideoUrl && bgVideoRef.current && bgVideoRef.current.readyState >= 2) {
+        const vid = bgVideoRef.current;
+        const scale = Math.max(W / vid.videoWidth, H / vid.videoHeight);
+        const vW = vid.videoWidth * scale;
+        const vH = vid.videoHeight * scale;
+        const vX = (W - vW) / 2;
+        const vY = (H - vH) / 2;
+        ctx.save();
+        applyPreviewFilter(ctx, styleConfig.colorFilter);
+        ctx.drawImage(vid, vX, vY, vW, vH);
+        ctx.restore();
+      } else if (!hasImages || styleConfig.imageFit === 'fit') {
+        // 3. Procedural Nature Motion Background if no custom video & (no images or images fitted)
+        renderNatureBackdrop(ctx, W, H, styleConfig.videoStyle, t, frameNum);
+      }
+
+      // 4. Foreground Images (Multi-image crossfade)
+      if (hasImages) {
         const N = imgs.length;
         const segmentDur = duration / N;
         const currentIdx = Math.min(N - 1, Math.floor(timeSec / segmentDur));
         const nextIdx = (currentIdx + 1) % N;
         const segLocalSec = timeSec - currentIdx * segmentDur;
-        const segProgress = segLocalSec / segmentDur;
 
-        // Transition window: crossfade in the last 1.2 seconds of each segment
+        // Crossfade window: last 1.2s of each segment
         const crossfadeWindow = Math.min(1.2, segmentDur * 0.25);
         const timeUntilEnd = segmentDur - segLocalSec;
         const isTransitioning = N > 1 && timeUntilEnd < crossfadeWindow;
         const transitionAlpha = isTransitioning ? 1 - timeUntilEnd / crossfadeWindow : 0;
 
-        // Draw Current Image
         drawSingleImage(ctx, imgs[currentIdx], W, H, t, frameNum, styleConfig, 1.0);
 
-        // Crossfade Next Image if transitioning
         if (isTransitioning && imgs[nextIdx]) {
           drawSingleImage(ctx, imgs[nextIdx], W, H, t, frameNum, styleConfig, transitionAlpha);
         }
-
-        // Atmosphere dark overlay
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-        ctx.fillRect(0, 0, W, H);
-
-        const vignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.4, W / 2, H / 2, W * 0.88);
-        vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        vignette.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
-        ctx.fillStyle = vignette;
-        ctx.fillRect(0, 0, W, H);
-
-        // Particle / Light Effects
-        renderEffectPreview(ctx, W, H, styleConfig.videoStyle, t, frameNum, particlesRef.current);
-
-        // Gold border framing
-        ctx.save();
-        const m = 16;
-        ctx.strokeStyle = 'rgba(217, 119, 6, 0.35)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(m, m, W - m * 2, H - m * 2);
-        ctx.restore();
       }
 
-      // Render Multi-Directional Kinetic Text Animation
+      // 5. Cinematic Backdrop Dimming (Text Contrast Control)
+      const dimAlpha = styleConfig.backdropDim ?? 0.38;
+      if (dimAlpha > 0) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${dimAlpha})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // 6. Cinematic Vignette
+      const vignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.35, W / 2, H / 2, W * 0.9);
+      vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignette.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+
+      // 7. Particle / Nature Atmospheric Effects
+      renderEffectPreview(ctx, W, H, styleConfig.videoStyle, t, frameNum, particlesRef.current);
+
+      // 8. Sacred Arabesque Gold Border Frame
+      if (styleConfig.showSacredFrame !== false) {
+        renderSacredFrame(ctx, W, H);
+      }
+
+      // 9. Sacred Floating Surah Citation Badge
+      if (styleConfig.showSurahBadge !== false && styleConfig.surahBadgeText) {
+        renderSurahBadge(ctx, styleConfig.surahBadgeText, W, H);
+      }
+
+      // 10. Multi-Directional Kinetic Text Animation
       if (text) {
         renderKineticText(ctx, text, W, H, t, frameNum, styleConfig.textAnimation);
       }
 
-      // Render Watermark
+      // 11. Live Dancing TikTok Audio Equalizer Bars
+      if (styleConfig.showAudioVisualizer !== false) {
+        renderAudioVisualizer(ctx, W, H, t, frameNum);
+      }
+
+      // 12. Watermark
       if (watermarkConfig.enabled) {
         renderWatermarkPreview(ctx, W, H, watermarkConfig, watermarkImgRef.current);
       }
@@ -201,6 +259,7 @@ export default function VideoPreview({
     if (!isPlaying) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (audioRef.current) audioRef.current.pause();
+      if (bgVideoRef.current) bgVideoRef.current.pause();
       return;
     }
 
@@ -208,6 +267,13 @@ export default function VideoPreview({
       audioRef.current.currentTime = currentTime % (audioRef.current.duration || 10);
       audioRef.current.muted = isMuted;
       audioRef.current.play().catch(() => {});
+    }
+
+    if (bgVideoRef.current) {
+      if (bgVideoRef.current.duration) {
+        bgVideoRef.current.currentTime = currentTime % bgVideoRef.current.duration;
+      }
+      bgVideoRef.current.play().catch(() => {});
     }
 
     startTimeRef.current = performance.now() - currentTime * 1000;
@@ -219,6 +285,7 @@ export default function VideoPreview({
         setCurrentTime(0);
         renderFrame(0);
         if (audioRef.current) audioRef.current.currentTime = 0;
+        if (bgVideoRef.current) bgVideoRef.current.currentTime = 0;
       } else {
         setCurrentTime(elapsedSec);
         renderFrame(elapsedSec);
@@ -231,6 +298,7 @@ export default function VideoPreview({
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (audioRef.current) audioRef.current.pause();
+      if (bgVideoRef.current) bgVideoRef.current.pause();
     };
   }, [isPlaying, isMuted, duration, renderFrame]);
 
@@ -246,6 +314,9 @@ export default function VideoPreview({
     setCurrentTime(val);
     if (audioRef.current) {
       audioRef.current.currentTime = val % (audioRef.current.duration || 10);
+    }
+    if (bgVideoRef.current && bgVideoRef.current.duration) {
+      bgVideoRef.current.currentTime = val % bgVideoRef.current.duration;
     }
     renderFrame(val);
   };
@@ -608,7 +679,251 @@ function renderEffectPreview(
   frameNum: number,
   particles: Particle[]
 ) {
-  // 1. Divine Golden Dust
+  // 1. Rolling Ocean Sea Waves
+  if (style === 'ocean-waves') {
+    ctx.save();
+    const horizonY = H * 0.52;
+
+    // Multi-layered rolling ocean sea waves
+    for (let wave = 0; wave < 4; wave++) {
+      ctx.beginPath();
+      const waveBaseY = horizonY + wave * (H * 0.13);
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, waveBaseY);
+
+      for (let x = 0; x <= W; x += 15) {
+        const waveH = 8 + wave * 7;
+        const speed = (wave + 1) * 0.04;
+        const freq = 0.008 - wave * 0.001;
+        const y =
+          waveBaseY +
+          Math.sin(x * freq + frameNum * speed) * waveH +
+          Math.cos(x * 0.004 + frameNum * speed * 0.5) * (waveH * 0.4);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+
+      const waveGrad = ctx.createLinearGradient(0, waveBaseY - 15, 0, H);
+      if (wave === 0) {
+        waveGrad.addColorStop(0, 'rgba(8, 48, 68, 0.85)');
+        waveGrad.addColorStop(1, 'rgba(3, 20, 32, 0.95)');
+      } else if (wave === 1) {
+        waveGrad.addColorStop(0, 'rgba(6, 78, 99, 0.8)');
+        waveGrad.addColorStop(1, 'rgba(2, 40, 58, 0.9)');
+      } else if (wave === 2) {
+        waveGrad.addColorStop(0, 'rgba(13, 110, 130, 0.75)');
+        waveGrad.addColorStop(1, 'rgba(4, 55, 75, 0.9)');
+      } else {
+        waveGrad.addColorStop(0, 'rgba(20, 140, 155, 0.7)');
+        waveGrad.addColorStop(1, 'rgba(4, 60, 80, 0.95)');
+      }
+      ctx.fillStyle = waveGrad;
+      ctx.fill();
+
+      // Translucent foam crest
+      ctx.strokeStyle = `rgba(220, 252, 231, ${0.35 + wave * 0.1})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Shimmering water light reflections
+    for (let s = 0; s < 18; s++) {
+      const sx = (s * 33 + Math.sin(frameNum * 0.05 + s) * 40) % W;
+      const sy = horizonY + 25 + (s * 25) % (H * 0.4);
+      const sw = 18 + Math.sin(frameNum * 0.1 + s) * 14;
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.25)';
+      ctx.fillRect(sx, sy, Math.max(5, sw), 2);
+    }
+    ctx.restore();
+  }
+
+  // 2. Rising Sun Dawn
+  if (style === 'rising-sun') {
+    ctx.save();
+    const horizonY = H * 0.65;
+    const sunY = horizonY - t * (H * 0.28) + 20;
+    const sunX = W / 2;
+    const sunRadius = 45;
+
+    // Expanding morning sky warm radial wash
+    const skyWash = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, W * 0.9);
+    skyWash.addColorStop(0, 'rgba(251, 191, 36, 0.35)');
+    skyWash.addColorStop(0.3, 'rgba(245, 158, 11, 0.2)');
+    skyWash.addColorStop(0.7, 'rgba(225, 29, 72, 0.1)');
+    skyWash.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = skyWash;
+    ctx.fillRect(0, 0, W, H);
+
+    // Radiant sunbeams streaming from the rising sun
+    for (let r = 0; r < 8; r++) {
+      const angle = (r / 8) * Math.PI + Math.sin(frameNum * 0.01) * 0.08;
+      const rayLen = W * 0.85;
+      const rx = sunX + Math.cos(angle - Math.PI) * rayLen;
+      const ry = sunY + Math.sin(angle - Math.PI) * rayLen;
+
+      ctx.beginPath();
+      ctx.moveTo(sunX, sunY);
+      ctx.lineTo(rx - 30, ry);
+      ctx.lineTo(rx + 30, ry);
+      ctx.closePath();
+      const rayAlpha = 0.08 + Math.sin(frameNum * 0.03 + r) * 0.04;
+      ctx.fillStyle = `rgba(254, 240, 138, ${rayAlpha})`;
+      ctx.fill();
+    }
+
+    // Glowing Golden Sun Orb
+    const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 2.2);
+    sunGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    sunGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.85)');
+    sunGlow.addColorStop(0.8, 'rgba(245, 158, 11, 0.3)');
+    sunGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = sunGlow;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunRadius * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mountain/horizon silhouette
+    ctx.fillStyle = 'rgba(5, 5, 10, 0.75)';
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, horizonY + 10);
+    ctx.quadraticCurveTo(W * 0.3, horizonY - 25, W * 0.5, horizonY + 5);
+    ctx.quadraticCurveTo(W * 0.75, horizonY - 20, W, horizonY + 15);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 3. Swaying Trees & Healing Leaves
+  if (style === 'tree-leaves') {
+    ctx.save();
+    // Leafy canopy branches framing top corners
+    ctx.fillStyle = 'rgba(10, 25, 15, 0.65)';
+    ctx.beginPath();
+    ctx.arc(-20, -20, 140, 0, Math.PI * 2);
+    ctx.arc(70, 20, 100, 0, Math.PI * 2);
+    ctx.arc(150, 0, 70, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(W + 20, -20, 140, 0, Math.PI * 2);
+    ctx.arc(W - 70, 20, 100, 0, Math.PI * 2);
+    ctx.arc(W - 150, 0, 70, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Fluttering leaves drifting in breeze
+    for (let l = 0; l < 28; l++) {
+      const speed = 1.0 + (l % 4) * 0.4;
+      const curY = (l * 38 + frameNum * speed) % (H + 40) - 20;
+      const wobbleX = (l * 40 + Math.sin(frameNum * 0.04 + l) * 35) % W;
+      const angle = Math.sin(frameNum * 0.05 + l * 0.7) * 0.8 + 0.3;
+      const leafSize = 11 + (l % 3) * 5;
+
+      ctx.save();
+      ctx.translate(wobbleX, curY);
+      ctx.rotate(angle);
+
+      const isGolden = l % 3 === 0;
+      ctx.fillStyle = isGolden ? 'rgba(251, 191, 36, 0.75)' : 'rgba(52, 211, 153, 0.7)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, leafSize, leafSize * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isGolden ? 'rgba(217, 119, 6, 0.9)' : 'rgba(5, 150, 105, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-leafSize, 0);
+      ctx.lineTo(leafSize, 0);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Gentle sunbeam filtering through canopy
+    const sunFilter = ctx.createLinearGradient(0, 0, W, H * 0.7);
+    sunFilter.addColorStop(0, 'rgba(251, 191, 36, 0.12)');
+    sunFilter.addColorStop(0.5, 'rgba(52, 211, 153, 0.05)');
+    sunFilter.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = sunFilter;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // 4. Golden Desert Dunes & Sand Mist
+  if (style === 'desert-dunes') {
+    ctx.save();
+    const horizonY = H * 0.55;
+    for (let d = 0; d < 3; d++) {
+      ctx.beginPath();
+      const duneBase = horizonY + d * (H * 0.14);
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, duneBase);
+      for (let x = 0; x <= W; x += 20) {
+        const y = duneBase + Math.sin(x * 0.006 + d * 1.5) * (18 + d * 10);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      const duneGrad = ctx.createLinearGradient(0, duneBase - 20, 0, H);
+      if (d === 0) {
+        duneGrad.addColorStop(0, 'rgba(180, 83, 9, 0.85)');
+        duneGrad.addColorStop(1, 'rgba(69, 26, 3, 0.95)');
+      } else if (d === 1) {
+        duneGrad.addColorStop(0, 'rgba(217, 119, 6, 0.8)');
+        duneGrad.addColorStop(1, 'rgba(120, 53, 15, 0.9)');
+      } else {
+        duneGrad.addColorStop(0, 'rgba(245, 158, 11, 0.75)');
+        duneGrad.addColorStop(1, 'rgba(146, 64, 14, 0.95)');
+      }
+      ctx.fillStyle = duneGrad;
+      ctx.fill();
+    }
+    // Drifting golden sand grains
+    for (let s = 0; s < 30; s++) {
+      const sx = (s * 25 + frameNum * (2.0 + (s % 3))) % (W + 20) - 10;
+      const sy = horizonY + (s * 18) % (H * 0.42);
+      ctx.fillStyle = `rgba(253, 230, 138, ${0.4 + (s % 4) * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.2 + (s % 2) * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 5. Serene Rain on Sacred Glass
+  if (style === 'sacred-rain') {
+    ctx.save();
+    // Rain streaks
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.28)';
+    ctx.lineWidth = 1;
+    for (let r = 0; r < 36; r++) {
+      const rx = (r * 19 + (r % 5) * 7) % W;
+      const ry = (r * 31 + frameNum * (7 + (r % 4) * 2)) % (H + 40) - 20;
+      const len = 18 + (r % 3) * 12;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx - 3, ry + len);
+      ctx.stroke();
+    }
+    // Trickling glass beads
+    for (let b = 0; b < 6; b++) {
+      const bx = (b * 88 + 40) % (W - 40);
+      const by = (frameNum * (0.6 + b * 0.2) + b * 140) % (H * 0.8) + H * 0.1;
+      const dropGlow = ctx.createRadialGradient(bx, by, 0, bx, by, 6);
+      dropGlow.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+      dropGlow.addColorStop(0.6, 'rgba(147, 197, 253, 0.4)');
+      dropGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = dropGlow;
+      ctx.beginPath();
+      ctx.arc(bx, by, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 6. Divine Golden Dust
   if (style === 'golden-dust') {
     ctx.save();
     for (const p of particles) {
@@ -842,4 +1157,201 @@ function wrapLines(
     if (current) lines.push(current);
   }
   return lines;
+}
+
+function applyPreviewFilter(ctx: CanvasRenderingContext2D, filter: string) {
+  switch (filter) {
+    case 'moody-grey':
+      ctx.filter = 'grayscale(100%) contrast(120%) brightness(0.85)';
+      break;
+    case 'midnight-dark':
+      ctx.filter = 'brightness(0.55) contrast(135%) saturate(80%)';
+      break;
+    case 'vintage-parchment':
+      ctx.filter = 'sepia(75%) contrast(110%) brightness(0.88)';
+      break;
+    case 'emerald-twilight':
+      ctx.filter = 'hue-rotate(65deg) contrast(115%) brightness(0.82)';
+      break;
+    default:
+      ctx.filter = 'none';
+      break;
+  }
+}
+
+function renderNatureBackdrop(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  style: string,
+  t: number,
+  frameNum: number
+) {
+  ctx.save();
+
+  if (style === 'ocean-waves') {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#020b14');
+    sky.addColorStop(0.5, '#051f33');
+    sky.addColorStop(0.75, '#072e48');
+    sky.addColorStop(1, '#041726');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    const moonAura = ctx.createRadialGradient(W / 2, H * 0.48, 5, W / 2, H * 0.48, W * 0.6);
+    moonAura.addColorStop(0, 'rgba(186, 230, 253, 0.25)');
+    moonAura.addColorStop(0.5, 'rgba(56, 189, 248, 0.08)');
+    moonAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = moonAura;
+    ctx.fillRect(0, 0, W, H);
+  } else if (style === 'rising-sun') {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#0b0f19');
+    sky.addColorStop(0.35, '#1e1b4b');
+    sky.addColorStop(0.65, '#831843');
+    sky.addColorStop(0.85, '#ea580c');
+    sky.addColorStop(1, '#ca8a04');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+  } else if (style === 'tree-leaves') {
+    const forest = ctx.createLinearGradient(0, 0, 0, H);
+    forest.addColorStop(0, '#03140a');
+    forest.addColorStop(0.4, '#062915');
+    forest.addColorStop(0.8, '#041d0e');
+    forest.addColorStop(1, '#020c06');
+    ctx.fillStyle = forest;
+    ctx.fillRect(0, 0, W, H);
+  } else if (style === 'desert-dunes') {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#0f0c29');
+    sky.addColorStop(0.4, '#302b63');
+    sky.addColorStop(0.65, '#8b4513');
+    sky.addColorStop(1, '#d97706');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+  } else if (style === 'sacred-rain') {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#0a0f18');
+    sky.addColorStop(0.5, '#131c2b');
+    sky.addColorStop(1, '#080d14');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const sacredBg = ctx.createRadialGradient(W / 2, H * 0.45, 10, W / 2, H * 0.45, W * 0.9);
+    sacredBg.addColorStop(0, '#101726');
+    sacredBg.addColorStop(0.6, '#080d16');
+    sacredBg.addColorStop(1, '#04070c');
+    ctx.fillStyle = sacredBg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.restore();
+}
+
+function renderSurahBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  W: number,
+  H: number
+) {
+  ctx.save();
+  const badgeH = 26;
+  const paddingX = 14;
+  ctx.font = '700 11px sans-serif';
+  const textWidth = ctx.measureText(text).width;
+  const badgeW = Math.min(W - 40, textWidth + paddingX * 2);
+  const badgeX = (W - badgeW) / 2;
+  const badgeY = 32;
+
+  // Frosted dark pill background
+  ctx.fillStyle = 'rgba(6, 10, 16, 0.82)';
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 13);
+  ctx.fill();
+
+  // Sacred gold border
+  ctx.strokeStyle = 'rgba(217, 119, 6, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Subtle gold inner glow
+  ctx.shadowColor = 'rgba(251, 191, 36, 0.4)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#fef08a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, W / 2, badgeY + badgeH / 2);
+  ctx.restore();
+}
+
+function renderAudioVisualizer(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  t: number,
+  frameNum: number
+) {
+  ctx.save();
+  const numBars = 18;
+  const barW = 3.5;
+  const gap = 3.5;
+  const totalW = numBars * barW + (numBars - 1) * gap;
+  const startX = (W - totalW) / 2;
+  const baseY = H - 85;
+
+  for (let i = 0; i < numBars; i++) {
+    const freq1 = Math.sin(frameNum * 0.16 + i * 0.45);
+    const freq2 = Math.cos(frameNum * 0.28 + i * 0.3);
+    const mag = Math.abs(freq1 * 0.65 + freq2 * 0.35);
+    const barH = 5 + mag * 22;
+    const x = startX + i * (barW + gap);
+    const y = baseY - barH;
+
+    const barGrad = ctx.createLinearGradient(0, y, 0, baseY);
+    barGrad.addColorStop(0, '#fef08a');
+    barGrad.addColorStop(0.4, '#d97706');
+    barGrad.addColorStop(1, '#059669');
+
+    ctx.fillStyle = barGrad;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function renderSacredFrame(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  ctx.save();
+  const m1 = 12;
+  const m2 = 18;
+
+  // Outer thin gold border
+  ctx.strokeStyle = 'rgba(217, 119, 6, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(m1, m1, W - m1 * 2, H - m1 * 2);
+
+  // Inner faint border
+  ctx.strokeStyle = 'rgba(217, 119, 6, 0.2)';
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(m2, m2, W - m2 * 2, H - m2 * 2);
+
+  // 4 Luxury Arabesque / Diamond Corner Accents
+  const corners = [
+    [m1, m1],
+    [W - m1, m1],
+    [m1, H - m1],
+    [W - m1, H - m1],
+  ];
+
+  ctx.fillStyle = '#fbbf24';
+  for (const [cx, cy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 4);
+    ctx.lineTo(cx + 4, cy);
+    ctx.lineTo(cx, cy + 4);
+    ctx.lineTo(cx - 4, cy);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }

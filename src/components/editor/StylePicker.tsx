@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Sparkles,
   Sun,
@@ -13,9 +13,27 @@ import {
   ArrowDownUp,
   MoveHorizontal,
   FlameKindling,
+  Waves,
+  Sunrise,
+  Trees,
+  Wind,
+  CloudRain,
+  Video,
+  Upload,
+  Sliders,
+  SlidersHorizontal,
+  Activity,
+  Award,
+  Check,
+  X,
 } from 'lucide-react';
 
 export type VideoStyleId =
+  | 'ocean-waves'
+  | 'rising-sun'
+  | 'tree-leaves'
+  | 'desert-dunes'
+  | 'sacred-rain'
   | 'golden-dust'
   | 'celestial-stars'
   | 'heavenly-rays'
@@ -47,6 +65,13 @@ export interface StyleConfig {
   textAnimation: TextAnimationId;
   showOverlay: boolean;
   accentColor: string;
+  // Professional & Unique Method 2 Features:
+  customVideoUrl?: string | null;
+  backdropDim?: number;          // 0 to 0.8
+  showSurahBadge?: boolean;      // Top floating surah/ayah badge
+  surahBadgeText?: string;       // e.g. "Holy Quran • Sacred Reflection"
+  showAudioVisualizer?: boolean; // TikTok/reels dancing audio bars
+  showSacredFrame?: boolean;     // Gold arabesque sacred borders
 }
 
 interface Props {
@@ -62,6 +87,46 @@ const MOTION_STYLES: {
   tag: string;
   highlight?: boolean;
 }[] = [
+  {
+    id: 'ocean-waves',
+    name: 'Rolling Ocean Sea',
+    desc: 'Deep flowing waves with moonlight water reflections',
+    icon: Waves,
+    tag: 'Nature ★',
+    highlight: true,
+  },
+  {
+    id: 'rising-sun',
+    name: 'Rising Sun Dawn',
+    desc: 'Golden sun rising on horizon with radiant morning rays',
+    icon: Sunrise,
+    tag: 'Nature ★',
+    highlight: true,
+  },
+  {
+    id: 'tree-leaves',
+    name: 'Swaying Trees & Leaves',
+    desc: 'Organic canopy with leaves fluttering in sacred breeze',
+    icon: Trees,
+    tag: 'Nature ★',
+    highlight: true,
+  },
+  {
+    id: 'desert-dunes',
+    name: 'Golden Desert Dunes',
+    desc: 'Majestic rippling dunes with blowing golden sand mist',
+    icon: Wind,
+    tag: 'Nature ★',
+    highlight: true,
+  },
+  {
+    id: 'sacred-rain',
+    name: 'Serene Rain on Glass',
+    desc: 'Tranquil droplets trickling down with light glimmers',
+    icon: CloudRain,
+    tag: 'Nature ★',
+    highlight: true,
+  },
   {
     id: 'golden-dust',
     name: 'Divine Golden Dust',
@@ -100,7 +165,6 @@ const MOTION_STYLES: {
     desc: 'Aesthetic glowing lens flares & soft atmospheric sweep',
     icon: FlameKindling,
     tag: 'Cinematic',
-    highlight: true,
   },
   {
     id: 'sacred-breathe',
@@ -134,7 +198,7 @@ const COLOR_FILTERS: {
   {
     id: 'original',
     name: 'Original Colors',
-    desc: 'Natural colors of your uploaded images',
+    desc: 'Natural colors of your uploaded images & scenery',
     previewBg: 'bg-gradient-to-r from-emerald-600 via-amber-500 to-rose-600',
   },
   {
@@ -215,18 +279,93 @@ const TEXT_ANIMATIONS: {
 ];
 
 export default function StylePicker({ config, onChange }: Props) {
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    onChange({
+      ...config,
+      customVideoUrl: url,
+    });
+  };
+
+  const clearCustomVideo = () => {
+    if (config.customVideoUrl && config.customVideoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(config.customVideoUrl);
+    }
+    onChange({
+      ...config,
+      customVideoUrl: null,
+    });
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-3.5">
+      {/* Method 2: Real Background Video Loop Upload */}
+      <div className="bg-gradient-to-r from-[#059669]/15 via-[#047857]/10 to-[#d97706]/15 border border-emerald-500/30 rounded-2xl p-2.5">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5">
+            <Video className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-xs font-bold text-white">Method 2: Cinematic Video Loop</span>
+          </div>
+          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+            Real Motion
+          </span>
+        </div>
+        <p className="text-[10px] text-gray-400 mb-2">
+          Upload any MP4/WebM drone clip, ocean wave, or nature video to play as the live looping backdrop.
+        </p>
+
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/mp4,video/webm"
+          onChange={handleVideoUpload}
+          className="hidden"
+        />
+
+        {config.customVideoUrl ? (
+          <div className="flex items-center justify-between bg-black/50 border border-emerald-500/40 rounded-xl px-2.5 py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-emerald-300">Custom Video Active</span>
+            </div>
+            <button
+              type="button"
+              onClick={clearCustomVideo}
+              className="text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-300 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+              Remove
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => videoInputRef.current?.click()}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/40 text-gray-300 hover:text-white py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Upload Real Video Loop (.mp4 / .webm)</span>
+          </button>
+        )}
+      </div>
+
       {/* Visual Animation & Particle Effects */}
       <div>
-        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2.5 flex items-center justify-between">
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#d97706]" />
-            Divine Particles & Visual Effects
+            Nature Scenery & Motion Styles
           </span>
-          <span className="text-[10px] text-emerald-400 font-bold">8 Visual Styles</span>
+          <span className="text-[10px] text-emerald-400 font-bold">13 Styles Available</span>
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[190px] overflow-y-auto pr-1 scrollbar-thin">
           {MOTION_STYLES.map((s) => {
             const Icon = s.icon;
             const isSelected = config.videoStyle === s.id;
@@ -235,22 +374,22 @@ export default function StylePicker({ config, onChange }: Props) {
                 key={s.id}
                 type="button"
                 onClick={() => onChange({ ...config, videoStyle: s.id })}
-                className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
+                className={`p-2 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
                   isSelected
                     ? 'border-[#059669] bg-[#059669]/15 shadow-lg shadow-[#059669]/15 ring-1 ring-[#059669]'
                     : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/20'
                 }`}
               >
-                <div className="flex items-start justify-between mb-1.5">
+                <div className="flex items-start justify-between mb-1">
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                    className={`w-5 h-5 rounded-lg flex items-center justify-center ${
                       isSelected ? 'bg-[#059669] text-white shadow-md' : 'bg-white/5 text-gray-400'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    <Icon className="w-3 h-3" />
                   </div>
                   <span
-                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                    className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full ${
                       isSelected
                         ? 'bg-[#059669]/25 text-[#10b981]'
                         : s.highlight
@@ -262,8 +401,8 @@ export default function StylePicker({ config, onChange }: Props) {
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-white mb-0.5">{s.name}</h4>
-                  <p className="text-[11px] text-gray-400 leading-snug">{s.desc}</p>
+                  <h4 className="text-[11px] font-bold text-white mb-0.2">{s.name}</h4>
+                  <p className="text-[9.5px] text-gray-400 leading-snug line-clamp-1">{s.desc}</p>
                 </div>
               </button>
             );
@@ -273,14 +412,14 @@ export default function StylePicker({ config, onChange }: Props) {
 
       {/* Kinetic Multi-Directional Text Animation Styles */}
       <div>
-        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 flex items-center justify-between">
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Type className="w-3.5 h-3.5 text-[#d97706]" />
-            Text Direction & Motion (Left, Right, Top, Kinetic)
+            Text Direction & Motion
           </span>
           <span className="text-[10px] text-amber-400 font-bold">Kinetic Styles</span>
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {TEXT_ANIMATIONS.map((t) => {
             const isSelected = config.textAnimation === t.id;
             const Icon = t.icon;
@@ -289,20 +428,20 @@ export default function StylePicker({ config, onChange }: Props) {
                 key={t.id}
                 type="button"
                 onClick={() => onChange({ ...config, textAnimation: t.id })}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
+                className={`p-2 rounded-xl border text-left transition-all ${
                   isSelected
                     ? 'border-[#d97706] bg-[#d97706]/15 text-white ring-1 ring-[#d97706] shadow-sm'
                     : 'border-white/10 bg-white/[0.02] text-gray-400 hover:text-white hover:border-white/20'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-amber-400' : 'text-gray-500'}`} />
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-white/5 text-gray-500'}`}>
+                <div className="flex items-center justify-between mb-0.5">
+                  <Icon className={`w-3 h-3 ${isSelected ? 'text-amber-400' : 'text-gray-500'}`} />
+                  <span className={`text-[8px] px-1 py-0.2 rounded ${isSelected ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-white/5 text-gray-500'}`}>
                     {t.badge}
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white mb-0.5">{t.name}</div>
-                <div className="text-[10px] text-gray-500 line-clamp-1">{t.desc}</div>
+                <div className="text-[11px] font-bold text-white mb-0.2">{t.name}</div>
+                <div className="text-[9px] text-gray-500 line-clamp-1">{t.desc}</div>
               </button>
             );
           })}
@@ -311,11 +450,11 @@ export default function StylePicker({ config, onChange }: Props) {
 
       {/* Color Filter / Mood (Grey, Dark, Sepia, Emerald) */}
       <div>
-        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
           <Palette className="w-3.5 h-3.5 text-[#059669]" />
-          Color Mood & Filter (Grey, Dark, Natural)
+          Color Mood & Filter
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {COLOR_FILTERS.map((f) => {
             const isSelected = config.colorFilter === f.id;
             return (
@@ -323,19 +462,107 @@ export default function StylePicker({ config, onChange }: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => onChange({ ...config, colorFilter: f.id })}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
+                className={`p-2 rounded-xl border text-left transition-all ${
                   isSelected
                     ? 'border-[#059669] bg-[#059669]/15 text-white ring-1 ring-[#059669]'
                     : 'border-white/10 bg-white/[0.02] text-gray-400 hover:text-white hover:border-white/20'
                 }`}
               >
-                <div className={`w-full h-1.5 rounded-full mb-2 ${f.previewBg}`} />
-                <div className="text-xs font-bold text-white mb-0.5">{f.name}</div>
-                <div className="text-[10px] text-gray-500 line-clamp-1">{f.desc}</div>
+                <div className={`w-full h-1 rounded-full mb-1 ${f.previewBg}`} />
+                <div className="text-[11px] font-bold text-white mb-0.2">{f.name}</div>
+                <div className="text-[9px] text-gray-500 line-clamp-1">{f.desc}</div>
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* Professional & Unique Video Enhancements */}
+      <div className="pt-2 border-t border-white/10 space-y-2.5">
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block flex items-center gap-1.5">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-[#d97706]" />
+          Professional Reel Enhancements
+        </label>
+
+        {/* Backdrop Darkness Slider */}
+        <div className="bg-white/[0.03] border border-white/5 rounded-xl p-2">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-gray-300 font-medium">Backdrop Dimming (Text Contrast)</span>
+            <span className="text-amber-400 font-bold text-[11px]">
+              {Math.round((config.backdropDim ?? 0.38) * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="0.8"
+            step="0.05"
+            value={config.backdropDim ?? 0.38}
+            onChange={(e) => onChange({ ...config, backdropDim: parseFloat(e.target.value) })}
+            className="w-full accent-amber-500 h-1 bg-white/10 rounded-lg cursor-pointer"
+          />
+        </div>
+
+        {/* Floating Surah Badge & Audio Visualizer Toggles */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Surah Citation Badge */}
+          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-2 space-y-1.5">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-xs text-gray-300 font-medium flex items-center gap-1.5">
+                <Award className="w-3 h-3 text-amber-400" />
+                Surah Citation Badge
+              </span>
+              <input
+                type="checkbox"
+                checked={config.showSurahBadge ?? true}
+                onChange={(e) => onChange({ ...config, showSurahBadge: e.target.checked })}
+                className="accent-amber-500 rounded cursor-pointer"
+              />
+            </label>
+            {config.showSurahBadge !== false && (
+              <input
+                type="text"
+                value={config.surahBadgeText ?? '✨ Holy Quran • Sacred Reflection'}
+                onChange={(e) => onChange({ ...config, surahBadgeText: e.target.value })}
+                placeholder="e.g. Surah Ar-Rahman • 55:13"
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none focus:border-amber-500"
+              />
+            )}
+          </div>
+
+          {/* TikTok Audio Visualizer Bars */}
+          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-2 flex flex-col justify-between">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-xs text-gray-300 font-medium flex items-center gap-1.5">
+                <Activity className="w-3 h-3 text-emerald-400" />
+                TikTok Audio Equalizer
+              </span>
+              <input
+                type="checkbox"
+                checked={config.showAudioVisualizer ?? true}
+                onChange={(e) => onChange({ ...config, showAudioVisualizer: e.target.checked })}
+                className="accent-emerald-500 rounded cursor-pointer"
+              />
+            </label>
+            <p className="text-[9px] text-gray-500 mt-1">
+              Dancing audio frequency bars at bottom of video
+            </p>
+          </div>
+        </div>
+
+        {/* Sacred Islamic Gold Frame */}
+        <label className="flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl p-2 cursor-pointer">
+          <span className="text-xs text-gray-300 font-medium flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            Sacred Arabesque Gold Border Frame
+          </span>
+          <input
+            type="checkbox"
+            checked={config.showSacredFrame ?? true}
+            onChange={(e) => onChange({ ...config, showSacredFrame: e.target.checked })}
+            className="accent-amber-500 rounded cursor-pointer"
+          />
+        </label>
       </div>
     </div>
   );
