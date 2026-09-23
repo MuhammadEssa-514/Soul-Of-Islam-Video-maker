@@ -45,6 +45,27 @@ export default function VideoPreview({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  // Force-load all Google Fonts into the browser so canvas can use them.
+  // The Canvas API ONLY sees fonts that have been explicitly loaded via
+  // document.fonts.load() — @import alone is not enough for canvas.
+  useEffect(() => {
+    const FONTS_TO_LOAD = [
+      '700 16px "Amiri"',
+      '700 16px "Scheherazade New"',
+      '600 16px "Playfair Display"',
+      '700 16px "Montserrat"',
+    ];
+    Promise.all(FONTS_TO_LOAD.map((f) => document.fonts.load(f)))
+      .then(() => {
+        setFontsReady(true);
+      })
+      .catch(() => {
+        // Still mark ready so preview renders even if a font failed
+        setFontsReady(true);
+      });
+  }, []);
 
   // Particles
   const particlesRef = useRef<Particle[]>([]);
@@ -238,7 +259,7 @@ export default function VideoPreview({
 
       // 10. Multi-Directional Kinetic Text Animation
       if (text) {
-        renderKineticText(ctx, text, W, H, t, frameNum, styleConfig.textAnimation);
+        renderKineticText(ctx, text, W, H, t, frameNum, styleConfig.textAnimation, styleConfig);
       }
 
       // 11. Live Dancing TikTok Audio Equalizer Bars
@@ -302,10 +323,10 @@ export default function VideoPreview({
     };
   }, [isPlaying, isMuted, duration, renderFrame]);
 
-  // Re-render when config changes
+  // Re-render when config or fonts change
   useEffect(() => {
     renderFrame(currentTime);
-  }, [currentTime, styleConfig, watermarkConfig, text, renderFrame]);
+  }, [currentTime, styleConfig, watermarkConfig, text, renderFrame, fontsReady]);
 
   const togglePlay = () => setIsPlaying(!isPlaying);
 
@@ -323,6 +344,11 @@ export default function VideoPreview({
 
   return (
     <div className="space-y-3">
+      {/* Hidden font primers — forces browser to download Google Fonts so Canvas can use them */}
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Amiri"', fontWeight: 700, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Scheherazade New"', fontWeight: 700, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Playfair Display"', fontWeight: 600, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Montserrat"', fontWeight: 900, fontSize: 1 }}>.</span>
       {/* Live Preview Screen */}
       <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black max-w-[280px] mx-auto aspect-[9/16] shadow-2xl group">
         <canvas
@@ -515,6 +541,18 @@ function drawSingleImage(
   ctx.restore();
 }
 
+// Font family → CSS font-family string mapping
+function getFontStack(fontFamily?: string): string {
+  switch (fontFamily) {
+    case 'amiri':        return '"Amiri", "Scheherazade New", serif';
+    case 'scheherazade': return '"Scheherazade New", "Amiri", serif';
+    case 'playfair':     return '"Playfair Display", Georgia, serif';
+    case 'montserrat':   return '"Montserrat", Arial, sans-serif';
+    case 'sans':         return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    default:             return '"Amiri", "Scheherazade New", serif';
+  }
+}
+
 // Multi-Directional & Kinetic Text Animation Renderer
 function renderKineticText(
   ctx: CanvasRenderingContext2D,
@@ -523,19 +561,48 @@ function renderKineticText(
   H: number,
   t: number,
   frameNum: number,
-  animation: string
+  animation: string,
+  styleConfig?: import('./StylePicker').StyleConfig
 ) {
   ctx.save();
   const isRtl = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
-  const fontSize = 26;
-  const lineHeight = 40;
-  ctx.textAlign = isRtl ? 'right' : 'center';
+
+  // --- Typography from StyleConfig ---
+  const fontSize = styleConfig?.textSize ?? 26;
+  const lineHeight = Math.round(fontSize * 1.55);
+  const textColor = styleConfig?.textColor ?? '#ffffff';
+  const fontStack = getFontStack(styleConfig?.fontFamily);
+  const fontWeight = styleConfig?.fontFamily === 'montserrat' ? '900' : '700';
+  const textAlignPref = styleConfig?.textAlign ?? 'center';
+  const textPosition = styleConfig?.textPosition ?? 'center';
+
+  // Resolve canvas textAlign: RTL text always right, else use user preference
+  const canvasAlign = isRtl ? 'right' : (textAlignPref as CanvasTextAlign);
+  ctx.textAlign = canvasAlign;
   ctx.direction = isRtl ? 'rtl' : 'ltr';
-  ctx.font = `700 ${fontSize}px "Amiri", "Scheherazade New", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  ctx.font = `${fontWeight} ${fontSize}px ${fontStack}`;
 
   const lines = wrapLines(ctx, text, W - 90, fontSize);
   const totalTextH = lines.length * lineHeight;
-  const startY = (H - totalTextH) / 2 + 20;
+
+  // Vertical position
+  let startY: number;
+  if (textPosition === 'top') {
+    startY = 80;
+  } else if (textPosition === 'bottom') {
+    startY = H - totalTextH - 80;
+  } else {
+    // center
+    startY = (H - totalTextH) / 2 + Math.round(fontSize * 0.4);
+  }
+
+  // X position based on alignment
+  const getX = () => {
+    if (isRtl) return W - 45;
+    if (canvasAlign === 'left') return 45;
+    if (canvasAlign === 'right') return W - 45;
+    return W / 2;
+  };
 
   ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
   ctx.shadowBlur = 12;
@@ -545,15 +612,14 @@ function renderKineticText(
   if (animation === 'converge') {
     for (let i = 0; i < lines.length; i++) {
       const lineProgress = Math.min(1, Math.max(0, (t * 1.5 - i * 0.12) / 0.3));
-      // Ease out cubic
       const ease = 1 - Math.pow(1 - lineProgress, 3);
       const isFromLeft = i % 2 === 0;
-      const targetX = isRtl ? W - 50 : W / 2;
+      const targetX = getX();
       const startX = isFromLeft ? targetX - 160 : targetX + 160;
       const curX = startX + (targetX - startX) * ease;
 
       ctx.globalAlpha = lineProgress;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = textColor;
       if (lineProgress > 0) {
         ctx.fillText(lines[i], curX, startY + i * lineHeight);
       }
@@ -567,12 +633,11 @@ function renderKineticText(
       const ease = 1 - Math.pow(1 - lineProgress, 3);
       const targetY = startY + i * lineHeight;
       const curY = targetY - 60 * (1 - ease);
-      const x = isRtl ? W - 50 : W / 2;
 
       ctx.globalAlpha = lineProgress;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = textColor;
       if (lineProgress > 0) {
-        ctx.fillText(lines[i], x, curY);
+        ctx.fillText(lines[i], getX(), curY);
       }
     }
   }
@@ -587,9 +652,7 @@ function renderKineticText(
     for (let i = 0; i < lines.length; i++) {
       const lineWords = lines[i].split(' ');
       const y = startY + i * lineHeight;
-      const x = isRtl ? W - 50 : W / 2;
 
-      // Check if any word on this line is visible
       const lineStartWord = wordIdx;
       const lineEndWord = wordIdx + lineWords.length;
       wordIdx = lineEndWord;
@@ -599,10 +662,9 @@ function renderKineticText(
           .slice(0, Math.max(0, activeWordIdx - lineStartWord + 1))
           .join(' ');
 
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(visibleLine, x, y);
+        ctx.fillStyle = textColor;
+        ctx.fillText(visibleLine, getX(), y);
 
-        // Highlight recent word with gold glow
         if (activeWordIdx >= lineStartWord && activeWordIdx < lineEndWord) {
           ctx.shadowColor = '#d97706';
           ctx.shadowBlur = 16;
@@ -621,19 +683,18 @@ function renderKineticText(
       const lineStart = charCount;
       const lineEnd = charCount + line.length;
       const y = startY + i * lineHeight;
-      const x = isRtl ? W - 50 : W / 2;
 
       if (charsToShow >= lineEnd) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(line, x, y);
+        ctx.fillStyle = textColor;
+        ctx.fillText(line, getX(), y);
       } else if (charsToShow > lineStart) {
         const visible = line.substring(0, charsToShow - lineStart);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(visible, x, y);
+        ctx.fillStyle = textColor;
+        ctx.fillText(visible, getX(), y);
 
         if (Math.floor(frameNum / 12) % 2 === 0) {
           const metrics = ctx.measureText(visible);
-          const cursorX = isRtl ? x - metrics.width - 4 : x + metrics.width / 2 + 4;
+          const cursorX = isRtl ? getX() - metrics.width - 4 : getX() + metrics.width / 2 + 4;
           ctx.fillStyle = '#d97706';
           ctx.fillRect(cursorX, y - fontSize + 4, 3, fontSize);
         }
@@ -647,10 +708,9 @@ function renderKineticText(
     for (let i = 0; i < lines.length; i++) {
       const lineProgress = Math.min(1, Math.max(0, (t * 1.6 - i * 0.15) / 0.3));
       const y = startY + i * lineHeight;
-      const x = isRtl ? W - 50 : W / 2;
       ctx.globalAlpha = lineProgress;
-      ctx.fillStyle = '#ffffff';
-      if (lineProgress > 0) ctx.fillText(lines[i], x, y);
+      ctx.fillStyle = textColor;
+      if (lineProgress > 0) ctx.fillText(lines[i], getX(), y);
     }
   }
 
@@ -660,10 +720,9 @@ function renderKineticText(
       const lineProgress = Math.min(1, Math.max(0, (t * 1.5 - i * 0.12) / 0.35));
       const lift = (1 - lineProgress) * 20;
       const y = startY + i * lineHeight + lift;
-      const x = isRtl ? W - 50 : W / 2;
       ctx.globalAlpha = lineProgress;
-      ctx.fillStyle = '#ffffff';
-      if (lineProgress > 0) ctx.fillText(lines[i], x, y);
+      ctx.fillStyle = textColor;
+      if (lineProgress > 0) ctx.fillText(lines[i], getX(), y);
     }
   }
 

@@ -25,6 +25,7 @@ import WatermarkPicker, { WatermarkConfig } from "@/components/editor/WatermarkP
 import VideoPreview from "@/components/editor/VideoPreview";
 import VideoGenerator from "@/components/editor/VideoGenerator";
 import ImageToTextStudio from "@/components/studio/ImageToTextStudio";
+import TypographyPicker from "@/components/editor/TypographyPicker";
 import { BACKDROP_PRESETS, createBackdropDataUrl } from "@/lib/backgrounds/islamicBackdrops";
 
 type StudioMode = "ocr" | "text-to-video" | "image-to-video";
@@ -84,6 +85,12 @@ function StudioContent() {
     textAnimation: "converge",
     showOverlay: true,
     accentColor: "#d97706",
+    // Typography defaults
+    fontFamily: "amiri",
+    textSize: 26,
+    textColor: "#ffffff",
+    textAlign: "center",
+    textPosition: "center",
   });
 
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>({
@@ -464,8 +471,10 @@ function StudioContent() {
               </button>
 
               {activePanel === "style" && (
-                <div className="p-3.5">
+                <div className="p-3.5 space-y-3">
                   <StylePicker config={styleConfig} onChange={setStyleConfig} />
+                  {/* Typography Controls — font, size, color, position, alignment */}
+                  <TypographyPicker config={styleConfig} onChange={setStyleConfig} />
                 </div>
               )}
             </div>

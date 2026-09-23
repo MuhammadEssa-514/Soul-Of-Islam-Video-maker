@@ -58,6 +58,10 @@ export type TextAnimationId =
   | 'fade'
   | 'float';
 
+export type FontFamilyId = 'amiri' | 'sans' | 'playfair' | 'montserrat' | 'scheherazade';
+export type TextPositionId = 'center' | 'top' | 'bottom';
+export type TextAlignId = 'center' | 'left' | 'right';
+
 export interface StyleConfig {
   videoStyle: VideoStyleId;
   colorFilter: ColorFilterId;
@@ -72,6 +76,13 @@ export interface StyleConfig {
   surahBadgeText?: string;       // e.g. "Holy Quran • Sacred Reflection"
   showAudioVisualizer?: boolean; // TikTok/reels dancing audio bars
   showSacredFrame?: boolean;     // Gold arabesque sacred borders
+
+  // Typography Controls:
+  textSize?: number;             // 16 to 48 (default 26)
+  textColor?: string;            // hex color, default '#ffffff'
+  fontFamily?: FontFamilyId;     // default 'amiri'
+  textPosition?: TextPositionId; // default 'center'
+  textAlign?: TextAlignId;       // default 'center'
 }
 
 interface Props {
