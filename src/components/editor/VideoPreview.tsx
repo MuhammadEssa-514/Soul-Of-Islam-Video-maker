@@ -54,18 +54,25 @@ export default function VideoPreview({
     const FONTS_TO_LOAD = [
       '700 16px "Amiri"',
       '700 16px "Scheherazade New"',
-      '600 16px "Playfair Display"',
+      '700 16px "Playfair Display"',
+      '800 16px "Playfair Display"',
       '700 16px "Montserrat"',
+      '900 16px "Montserrat"',
     ];
-    Promise.all(FONTS_TO_LOAD.map((f) => document.fonts.load(f)))
+    // Also wait for document.fonts.ready to ensure ALL fonts are settled
+    Promise.all([
+      ...FONTS_TO_LOAD.map((f) => document.fonts.load(f)),
+      document.fonts.ready,
+    ])
       .then(() => {
         setFontsReady(true);
+        renderFrame(currentTime);
       })
       .catch(() => {
-        // Still mark ready so preview renders even if a font failed
         setFontsReady(true);
       });
   }, []);
+
 
   // Particles
   const particlesRef = useRef<Particle[]>([]);
@@ -328,6 +335,27 @@ export default function VideoPreview({
     renderFrame(currentTime);
   }, [currentTime, styleConfig, watermarkConfig, text, renderFrame, fontsReady]);
 
+  // When selected fontFamily changes, explicitly load it and re-render frame
+  useEffect(() => {
+    const family = styleConfig?.fontFamily ?? 'amiri';
+    let weight = '700';
+    if (family === 'montserrat') weight = '900';
+    else if (family === 'playfair') weight = '800';
+
+    let fontName = 'Amiri';
+    if (family === 'scheherazade') fontName = 'Scheherazade New';
+    else if (family === 'playfair') fontName = 'Playfair Display';
+    else if (family === 'montserrat') fontName = 'Montserrat';
+    else if (family === 'sans') {
+      renderFrame(currentTime);
+      return;
+    }
+
+    document.fonts.load(`${weight} 26px "${fontName}"`).then(() => {
+      renderFrame(currentTime);
+    }).catch(() => {});
+  }, [styleConfig?.fontFamily, currentTime, renderFrame]);
+
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,7 +375,9 @@ export default function VideoPreview({
       {/* Hidden font primers — forces browser to download Google Fonts so Canvas can use them */}
       <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Amiri"', fontWeight: 700, fontSize: 1 }}>.</span>
       <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Scheherazade New"', fontWeight: 700, fontSize: 1 }}>.</span>
-      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Playfair Display"', fontWeight: 600, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Playfair Display"', fontWeight: 700, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Playfair Display"', fontWeight: 800, fontSize: 1 }}>.</span>
+      <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Montserrat"', fontWeight: 700, fontSize: 1 }}>.</span>
       <span aria-hidden className="absolute opacity-0 pointer-events-none select-none" style={{ fontFamily: '"Montserrat"', fontWeight: 900, fontSize: 1 }}>.</span>
       {/* Live Preview Screen */}
       <div className="relative rounded-2xl overflow-hidden border border-white/15 bg-black max-w-[280px] mx-auto aspect-[9/16] shadow-2xl group">
@@ -572,7 +602,6 @@ function renderKineticText(
   const lineHeight = Math.round(fontSize * 1.55);
   const textColor = styleConfig?.textColor ?? '#ffffff';
   const fontStack = getFontStack(styleConfig?.fontFamily);
-  const fontWeight = styleConfig?.fontFamily === 'montserrat' ? '900' : '700';
   const textAlignPref = styleConfig?.textAlign ?? 'center';
   const textPosition = styleConfig?.textPosition ?? 'center';
 
@@ -580,6 +609,10 @@ function renderKineticText(
   const canvasAlign = isRtl ? 'right' : (textAlignPref as CanvasTextAlign);
   ctx.textAlign = canvasAlign;
   ctx.direction = isRtl ? 'rtl' : 'ltr';
+  // Match font weights to those actually imported in globals.css
+  let fontWeight = '700';
+  if (styleConfig?.fontFamily === 'montserrat') fontWeight = '900';
+  else if (styleConfig?.fontFamily === 'playfair') fontWeight = '800';
   ctx.font = `${fontWeight} ${fontSize}px ${fontStack}`;
 
   const lines = wrapLines(ctx, text, W - 90, fontSize);
@@ -1193,7 +1226,7 @@ function wrapLines(
   maxWidth: number,
   fontSize: number
 ): string[] {
-  ctx.font = `700 ${fontSize}px sans-serif`;
+  // Use existing ctx.font which was already configured with proper fontStack, weight, and size
   const paragraphs = text.split('\n');
   const lines: string[] = [];
 

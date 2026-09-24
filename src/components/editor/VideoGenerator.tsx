@@ -1003,13 +1003,16 @@ function renderKineticText(
   const lineHeight = Math.round(fontSize * 1.55);
   const textColor = styleConfig?.textColor ?? '#ffffff';
   const fontStack = getFontStack(styleConfig?.fontFamily);
-  const fontWeight = styleConfig?.fontFamily === 'montserrat' ? '900' : '700';
   const textAlignPref = styleConfig?.textAlign ?? 'center';
   const textPosition = styleConfig?.textPosition ?? 'center';
 
   const canvasAlign = isRtl ? 'right' : (textAlignPref as CanvasTextAlign);
   ctx.textAlign = canvasAlign;
   ctx.direction = isRtl ? 'rtl' : 'ltr';
+  // Match font weights to those actually imported in globals.css
+  let fontWeight = '700';
+  if (styleConfig?.fontFamily === 'montserrat') fontWeight = '900';
+  else if (styleConfig?.fontFamily === 'playfair') fontWeight = '800';
   ctx.font = `${fontWeight} ${fontSize}px ${fontStack}`;
 
   const lines = wrapText(ctx, text, W - 180, fontSize);
@@ -1282,7 +1285,7 @@ function wrapText(
   maxWidth: number,
   fontSize: number
 ): string[] {
-  ctx.font = `700 ${fontSize}px sans-serif`;
+  // Use existing ctx.font which was already configured with proper fontStack, weight, and size
   const paragraphs = text.split('\n');
   const lines: string[] = [];
 
